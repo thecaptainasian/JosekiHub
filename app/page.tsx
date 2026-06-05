@@ -89,7 +89,7 @@ export default async function Home() {
       </HeroSection>
 
       {isSignedIn ? (
-        <GoBoard />
+        <GoBoard canSaveSequences />
       ) : (
         <section className="board-card auth-lock-card">
           <div className="section-heading compact">

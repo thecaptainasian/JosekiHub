@@ -1,6 +1,7 @@
 import AuthForm from "./auth-form";
-import { signInAction, signUpAction } from "./actions";
+import { signInAction, signOutAction, signUpAction } from "./actions";
 import GoBoard from "../components/go-board";
+import { createClient } from "@/lib/supabase/server";
 import { hasSupabaseEnv } from "@/lib/supabase/env";
 
 type AuthPageProps = {
@@ -12,6 +13,18 @@ type AuthPageProps = {
 export default async function AuthPage({ searchParams }: AuthPageProps) {
   const rawMessage = (await searchParams).message;
   const message = Array.isArray(rawMessage) ? rawMessage[0] : rawMessage;
+  const hasAuthConfig = hasSupabaseEnv();
+  let isSignedIn = false;
+  let email: string | null = null;
+
+  if (hasAuthConfig) {
+    const supabase = await createClient();
+    const { data } = await supabase.auth.getClaims();
+    const claims = (data?.claims ?? null) as Record<string, unknown> | null;
+
+    isSignedIn = typeof claims?.sub === "string";
+    email = typeof claims?.email === "string" ? claims.email : null;
+  }
 
   return (
     <main className="joseki-page auth-board-page">
@@ -23,12 +36,21 @@ export default async function AuthPage({ searchParams }: AuthPageProps) {
           </h1>
         </div>
 
-        {!hasSupabaseEnv() ? (
+        {!hasAuthConfig ? (
           <div className="auth-setup-note">
             <p>
               Copy `.env.example` to `.env.local`, fill in your project URL,
               publishable key, and site URL, then restart the Next dev server.
             </p>
+          </div>
+        ) : isSignedIn ? (
+          <div className="auth-signed-in">
+            <p>{email ?? "Signed in"}</p>
+            <form action={signOutAction} className="inline-form">
+              <button type="submit" className="control-button danger">
+                Sign out
+              </button>
+            </form>
           </div>
         ) : (
           <div className="auth-grid" aria-label="Authentication forms">
@@ -60,7 +82,7 @@ export default async function AuthPage({ searchParams }: AuthPageProps) {
         </section>
       ) : null}
 
-      <GoBoard />
+      <GoBoard canSaveSequences={isSignedIn} />
     </main>
   );
 }

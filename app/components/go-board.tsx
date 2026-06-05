@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import type { CSSProperties } from "react";
+import { saveSequenceAction } from "../sequences/actions";
 import {
   BOARD_SIZE,
   COLUMN_LABELS,
@@ -22,6 +23,10 @@ interface Notice {
   tone: NoticeTone;
 }
 
+interface GoBoardProps {
+  canSaveSequences?: boolean;
+}
+
 const ROW_LABELS = Array.from({ length: BOARD_SIZE }, (_, index) =>
   String(BOARD_SIZE - index),
 );
@@ -29,12 +34,13 @@ const STAR_POINTS = [3, 9, 15].flatMap((row) =>
   [3, 9, 15].map((col) => ({ row, col })),
 );
 
-export default function GoBoard() {
+export default function GoBoard({ canSaveSequences = false }: GoBoardProps) {
   const [history, setHistory] = useState<GameState[]>(() => [
     createInitialGameState(),
   ]);
   const [labelMode, setLabelMode] = useState<LabelMode>("recent");
   const [hoveredPoint, setHoveredPoint] = useState<string | null>(null);
+  const [isSavingSequence, startSavingSequence] = useTransition();
   const [notice, setNotice] = useState<Notice>({
     text: "Click any intersection to begin sketching a joseki line.",
     tone: "info",
@@ -110,6 +116,28 @@ export default function GoBoard() {
       }
 
       return "recent";
+    });
+  }
+
+  function handleSaveSequence() {
+    if (state.moves.length === 0) {
+      setNotice({
+        text: "Play at least one move before saving a sequence.",
+        tone: "error",
+      });
+      return;
+    }
+
+    startSavingSequence(async () => {
+      const result = await saveSequenceAction({
+        boardHash: state.boardHash,
+        moves: state.moves,
+      });
+
+      setNotice({
+        text: result.message,
+        tone: result.ok ? "info" : "error",
+      });
     });
   }
 
@@ -283,6 +311,16 @@ export default function GoBoard() {
           <button type="button" className="control-button danger" onClick={handleReset}>
             Reset
           </button>
+          {canSaveSequences ? (
+            <button
+              type="button"
+              className="control-button primary sequence-save-button"
+              onClick={handleSaveSequence}
+              disabled={isSavingSequence || state.moves.length === 0}
+            >
+              {isSavingSequence ? "Saving..." : "Save sequence"}
+            </button>
+          ) : null}
         </div>
 
         <div className="moves-card">

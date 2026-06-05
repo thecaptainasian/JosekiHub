@@ -217,6 +217,18 @@ select {
   margin: 0;
 }
 
+.auth-signed-in {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  color: var(--muted);
+}
+
+.auth-signed-in p {
+  margin: 0;
+}
+
 .auth-form-card {
   display: grid;
   gap: 0.8rem;
@@ -647,6 +659,10 @@ select {
   cursor: not-allowed;
 }
 
+.sequence-save-button {
+  grid-column: 1 / -1;
+}
+
 .auth-submit {
   width: 100%;
   min-height: 2.75rem;
@@ -766,7 +782,12 @@ select {
     display: grid;
   }
 
-  .session-actions > * {
+  .session-actions > *,
+  .auth-signed-in {
     width: 100%;
+  }
+
+  .auth-signed-in {
+    display: grid;
   }
 }
