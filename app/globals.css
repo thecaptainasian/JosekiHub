@@ -54,6 +54,16 @@ a {
   color: inherit;
 }
 
+.inline-link {
+  color: var(--accent-strong);
+  text-decoration: none;
+}
+
+.inline-link:hover,
+.inline-link:focus-visible {
+  text-decoration: underline;
+}
+
 button,
 input,
 textarea,
@@ -125,6 +135,186 @@ select {
 .status-meta,
 .move-empty {
   margin: 0;
+}
+
+.session-card,
+.auth-callout,
+.auth-form-card,
+.setup-card,
+.auth-lock-card {
+  padding: 1rem;
+  border-radius: 1.25rem;
+  border: 1px solid rgba(255, 245, 214, 0.08);
+  background:
+    linear-gradient(180deg, rgba(255, 245, 214, 0.03), rgba(255, 245, 214, 0.01)),
+    rgba(0, 0, 0, 0.08);
+}
+
+.session-card,
+.auth-callout,
+.setup-card,
+.auth-lock-card {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.session-email {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+}
+
+.session-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+}
+
+.inline-form {
+  margin: 0;
+}
+
+.auth-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  align-items: stretch;
+}
+
+.auth-board-page {
+  padding-top: 1.5rem;
+}
+
+.auth-strip {
+  display: grid;
+  grid-template-columns: minmax(12rem, 0.38fr) minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
+  padding: 1rem;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.auth-strip-heading {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.auth-strip-title {
+  margin: 0;
+  color: var(--foreground);
+  font-size: 1.35rem;
+  font-weight: 650;
+  line-height: 1.15;
+}
+
+.auth-setup-note {
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.auth-setup-note p {
+  margin: 0;
+}
+
+.auth-form-card {
+  display: grid;
+  gap: 0.8rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.auth-form-heading {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.auth-form-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.auth-form-note {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.auth-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap: 0.65rem;
+  align-items: end;
+}
+
+.field-group {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.field-label {
+  color: var(--foreground);
+  font-weight: 600;
+  font-size: 0.84rem;
+}
+
+.auth-input {
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0.72rem 0.8rem;
+  border-radius: 0.7rem;
+  border: 1px solid rgba(255, 242, 204, 0.14);
+  background: rgba(10, 9, 6, 0.5);
+  color: var(--foreground);
+  outline: none;
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    background 140ms ease;
+}
+
+.auth-input::placeholder {
+  color: rgba(241, 232, 205, 0.44);
+}
+
+.auth-input:focus {
+  border-color: rgba(243, 225, 143, 0.4);
+  background: rgba(16, 14, 10, 0.68);
+  box-shadow: 0 0 0 3px rgba(243, 225, 143, 0.08);
+}
+
+.field-error {
+  margin: 0;
+  color: #f2baa1;
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+.auth-status {
+  margin: 0;
+  grid-column: 1 / -1;
+  line-height: 1.55;
+}
+
+.auth-status[data-tone="error"] {
+  color: #f2baa1;
+}
+
+.auth-status[data-tone="success"] {
+  color: var(--accent-strong);
+}
+
+.auth-footnote {
+  margin: 0;
+  grid-column: 1 / -1;
+  color: rgba(241, 232, 205, 0.66);
+  line-height: 1.55;
+}
+
+.auth-page-message {
+  margin-top: -0.25rem;
 }
 
 .workbench {
@@ -420,6 +610,9 @@ select {
 }
 
 .control-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   padding: 0.95rem 1rem;
   border-radius: 999px;
   border: 1px solid rgba(255, 242, 204, 0.16);
@@ -452,6 +645,13 @@ select {
 .control-button:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+.auth-submit {
+  width: 100%;
+  min-height: 2.75rem;
+  padding-block: 0.72rem;
+  white-space: nowrap;
 }
 
 .moves-card {
@@ -517,12 +717,20 @@ select {
 
 @media (max-width: 1100px) {
   .hero-panel,
-  .workbench {
+  .workbench,
+  .auth-strip {
     grid-template-columns: 1fr;
   }
 
   .hero-title {
     max-width: 16ch;
+  }
+}
+
+@media (max-width: 900px) {
+  .auth-grid,
+  .auth-form {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -552,5 +760,13 @@ select {
   .controls,
   .stat-grid {
     grid-template-columns: 1fr;
+  }
+
+  .session-actions {
+    display: grid;
+  }
+
+  .session-actions > * {
+    width: 100%;
   }
 }
