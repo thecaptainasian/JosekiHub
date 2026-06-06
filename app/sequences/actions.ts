@@ -1,6 +1,7 @@
 "use server";
 
 import { BOARD_SIZE, type MoveRecord, type Player } from "../lib/go";
+import { getNextSavedMoves, saveSequence } from "./tree";
 import { createClient } from "@/lib/supabase/server";
 import { hasSupabaseEnv } from "@/lib/supabase/env";
 
@@ -47,26 +48,61 @@ export async function saveSequenceAction(input: SaveSequenceInput) {
     };
   }
 
-  const { error } = await supabase.from("sequences").insert({
-    board_hash: boardHash,
-    board_size: BOARD_SIZE,
-    move_count: moves.length,
-    move_path: createMovePath(moves),
-    moves,
-    user_id: userId,
-  });
+  try {
+    const result = await saveSequence(supabase, moves, userId);
+    const branchMessage =
+      result.createdNodeCount === 0
+        ? "Reused the existing joseki branch."
+        : `Added ${result.createdNodeCount} new branch node${result.createdNodeCount === 1 ? "" : "s"}.`;
 
-  if (error) {
+    return {
+      ok: true,
+      message: `Saved ${moves.length}-move sequence. ${branchMessage}`,
+      nextMoves: result.nextMoves,
+      terminalNodeId: result.terminalNodeId,
+    };
+  } catch (error) {
     return {
       ok: false,
-      message: error.message,
+      message: error instanceof Error ? error.message : "Unable to save sequence.",
+    };
+  }
+}
+
+export async function getNextSavedMovesAction(currentNodeId: unknown) {
+  if (!hasSupabaseEnv()) {
+    return {
+      moves: [],
+      ok: false,
+      message: "Supabase is not configured yet.",
     };
   }
 
-  return {
-    ok: true,
-    message: `Saved ${moves.length}-move sequence.`,
-  };
+  if (currentNodeId !== null && typeof currentNodeId !== "string") {
+    return {
+      moves: [],
+      ok: false,
+      message: "The current joseki node is invalid.",
+    };
+  }
+
+  try {
+    const supabase = await createClient();
+    const moves = await getNextSavedMoves(supabase, currentNodeId);
+
+    return {
+      moves,
+      ok: true,
+      message: null,
+    };
+  } catch (error) {
+    return {
+      moves: [],
+      ok: false,
+      message:
+        error instanceof Error ? error.message : "Unable to load next moves.",
+    };
+  }
 }
 
 function sanitizeMoves(value: unknown): MoveRecord[] | null {
@@ -154,16 +190,4 @@ function sanitizePoint(value: unknown) {
 
 function sanitizeInteger(value: unknown): number | null {
   return typeof value === "number" && Number.isInteger(value) ? value : null;
-}
-
-function createMovePath(moves: MoveRecord[]) {
-  return moves
-    .map((move) => {
-      if (!move.point) {
-        return `${move.player}:pass`;
-      }
-
-      return `${move.player}:${move.point.row},${move.point.col}`;
-    })
-    .join("|");
 }

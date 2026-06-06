@@ -495,6 +495,27 @@ select {
   box-shadow: inset 0 0 0 1px rgba(79, 63, 31, 0.18);
 }
 
+.intersection[data-saved-branch="true"] {
+  color: var(--foreground);
+}
+
+.intersection[data-saved-branch="true"]::before {
+  opacity: 0;
+}
+
+.intersection[data-saved-branch="true"][data-hovered="true"]::before {
+  opacity: 0.34;
+  transform: scale(0.82);
+}
+
+.intersection[data-saved-branch="true"][data-hovered="true"][data-next-player="black"]::before {
+  background: rgba(18, 16, 14, 0.42);
+}
+
+.intersection[data-saved-branch="true"][data-hovered="true"][data-next-player="white"]::before {
+  background: rgba(246, 237, 216, 0.58);
+}
+
 .intersection[data-occupied="true"] {
   cursor: default;
 }
@@ -534,6 +555,43 @@ select {
   font-size: clamp(0.44rem, 0.82vw, 0.8rem);
   line-height: 1;
   text-shadow: 0 1px 0 rgba(0, 0, 0, 0.08);
+}
+
+.next-move-indicator {
+  position: relative;
+  z-index: 1;
+  width: clamp(0.42rem, 1.15vw, 0.68rem);
+  aspect-ratio: 1;
+  border-radius: 999px;
+  background: rgba(255, 250, 231, 0.72);
+  box-shadow:
+    0 0 0 2px rgba(38, 29, 13, 0.54),
+    0 0.18rem 0.35rem rgba(0, 0, 0, 0.16);
+  transition:
+    background 140ms ease,
+    box-shadow 140ms ease,
+    transform 140ms ease;
+}
+
+.intersection[data-branch-style="1"] .next-move-indicator {
+  background: rgba(242, 225, 143, 0.82);
+}
+
+.intersection[data-branch-style="2"] .next-move-indicator {
+  background: rgba(178, 205, 139, 0.78);
+}
+
+.intersection[data-branch-style="3"] .next-move-indicator {
+  background: rgba(239, 177, 142, 0.78);
+}
+
+.intersection[data-saved-branch="true"][data-hovered="true"] .next-move-indicator {
+  background: rgba(255, 250, 231, 0.95);
+  box-shadow:
+    0 0 0 2px rgba(26, 20, 10, 0.68),
+    0 0 0 5px rgba(255, 250, 231, 0.22),
+    0 0.24rem 0.45rem rgba(0, 0, 0, 0.18);
+  transform: scale(1.14);
 }
 
 .inspector-card {

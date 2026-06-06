@@ -2,7 +2,11 @@
 
 import { useState, useTransition } from "react";
 import type { CSSProperties } from "react";
-import { saveSequenceAction } from "../sequences/actions";
+import {
+  getNextSavedMovesAction,
+  saveSequenceAction,
+} from "../sequences/actions";
+import type { NextJosekiMove } from "../sequences/types";
 import {
   BOARD_SIZE,
   COLUMN_LABELS,
@@ -25,6 +29,13 @@ interface Notice {
 
 interface GoBoardProps {
   canSaveSequences?: boolean;
+  initialNextMoves?: NextJosekiMove[];
+  initialNodeId?: string | null;
+}
+
+interface HistoryEntry {
+  nodeId: string | null;
+  state: GameState;
 }
 
 const ROW_LABELS = Array.from({ length: BOARD_SIZE }, (_, index) =>
@@ -34,22 +45,41 @@ const STAR_POINTS = [3, 9, 15].flatMap((row) =>
   [3, 9, 15].map((col) => ({ row, col })),
 );
 
-export default function GoBoard({ canSaveSequences = false }: GoBoardProps) {
-  const [history, setHistory] = useState<GameState[]>(() => [
-    createInitialGameState(),
+export default function GoBoard({
+  canSaveSequences = false,
+  initialNextMoves = [],
+  initialNodeId = null,
+}: GoBoardProps) {
+  const [history, setHistory] = useState<HistoryEntry[]>(() => [
+    {
+      nodeId: initialNodeId,
+      state: createInitialGameState(),
+    },
   ]);
+  const [nextMoves, setNextMoves] =
+    useState<NextJosekiMove[]>(initialNextMoves);
   const [labelMode, setLabelMode] = useState<LabelMode>("recent");
   const [hoveredPoint, setHoveredPoint] = useState<string | null>(null);
+  const [isLoadingBranches, startLoadingBranches] = useTransition();
   const [isSavingSequence, startSavingSequence] = useTransition();
   const [notice, setNotice] = useState<Notice>({
     text: "Click any intersection to begin sketching a joseki line.",
     tone: "info",
   });
 
-  const state = history[history.length - 1];
+  const currentEntry = history[history.length - 1];
+  const state = currentEntry.state;
+  const currentNodeId = currentEntry.nodeId;
   const recentMoves = state.moves.slice(-8).reverse();
   const lastMoveRecord =
     state.moves.length > 0 ? state.moves[state.moves.length - 1] : null;
+  const playableNextMoves = nextMoves.filter(
+    (move) =>
+      move.moveType === "play" &&
+      move.row !== null &&
+      move.col !== null &&
+      !state.board[move.row]?.[move.col],
+  );
 
   function handlePlay(row: number, col: number) {
     const result = playMove(state, row, col);
@@ -63,13 +93,32 @@ export default function GoBoard({ canSaveSequences = false }: GoBoardProps) {
     }
 
     const nextState = result.state;
+    const matchingBranch = findNextMove(row, col, playableNextMoves);
+    const nextNodeId = matchingBranch?.id ?? null;
 
-    setHistory((currentHistory) => [...currentHistory, nextState]);
+    setHistory((currentHistory) => [
+      ...currentHistory,
+      {
+        nodeId: nextNodeId,
+        state: nextState,
+      },
+    ]);
     setHoveredPoint(null);
     setNotice({
-      text: `${getPlayerName(nextState.moves[nextState.moves.length - 1].player)} played ${formatCoordinate(row, col)}.`,
+      text: matchingBranch
+        ? `${getPlayerName(nextState.moves[nextState.moves.length - 1].player)} followed a saved branch at ${formatCoordinate(row, col)}.`
+        : `${getPlayerName(nextState.moves[nextState.moves.length - 1].player)} played ${formatCoordinate(row, col)} outside the saved tree.`,
       tone: "info",
     });
+    loadNextSavedMoves(nextNodeId);
+  }
+
+  function handleIndicatorClick(move: NextJosekiMove) {
+    if (move.moveType !== "play" || move.row === null || move.col === null) {
+      return;
+    }
+
+    handlePlay(move.row, move.col);
   }
 
   function handleUndo() {
@@ -77,32 +126,55 @@ export default function GoBoard({ canSaveSequences = false }: GoBoardProps) {
       return;
     }
 
+    const previousEntry = history[history.length - 2];
+
     setHistory((currentHistory) => currentHistory.slice(0, -1));
     setHoveredPoint(null);
     setNotice({
       text: "Stepped back one move.",
       tone: "info",
     });
+    loadNextSavedMoves(previousEntry.nodeId);
   }
 
   function handlePass() {
     const nextState = passTurn(state);
+    const matchingBranch = nextMoves.find(
+      (move) =>
+        move.moveType === "pass" && move.player === state.currentPlayer,
+    );
+    const nextNodeId = matchingBranch?.id ?? null;
 
-    setHistory((currentHistory) => [...currentHistory, nextState]);
+    setHistory((currentHistory) => [
+      ...currentHistory,
+      {
+        nodeId: nextNodeId,
+        state: nextState,
+      },
+    ]);
     setHoveredPoint(null);
     setNotice({
-      text: `${getPlayerName(state.currentPlayer)} passed.`,
+      text: matchingBranch
+        ? `${getPlayerName(state.currentPlayer)} followed a saved pass branch.`
+        : `${getPlayerName(state.currentPlayer)} passed outside the saved tree.`,
       tone: "info",
     });
+    loadNextSavedMoves(nextNodeId);
   }
 
   function handleReset() {
-    setHistory([createInitialGameState()]);
+    setHistory([
+      {
+        nodeId: initialNodeId,
+        state: createInitialGameState(),
+      },
+    ]);
     setHoveredPoint(null);
     setNotice({
       text: "The board has been cleared for a fresh opening.",
       tone: "info",
     });
+    loadNextSavedMoves(initialNodeId);
   }
 
   function cycleLabels() {
@@ -137,6 +209,43 @@ export default function GoBoard({ canSaveSequences = false }: GoBoardProps) {
       setNotice({
         text: result.message,
         tone: result.ok ? "info" : "error",
+      });
+
+      if (result.ok && typeof result.terminalNodeId === "string") {
+        setHistory((currentHistory) => {
+          const nextHistory = currentHistory.slice();
+          const latestEntry = nextHistory[nextHistory.length - 1];
+
+          nextHistory[nextHistory.length - 1] = {
+            ...latestEntry,
+            nodeId: result.terminalNodeId,
+          };
+
+          return nextHistory;
+        });
+        setNextMoves(result.nextMoves ?? []);
+      }
+    });
+  }
+
+  function loadNextSavedMoves(nodeId: string | null) {
+    if (!nodeId) {
+      setNextMoves([]);
+      return;
+    }
+
+    startLoadingBranches(async () => {
+      const result = await getNextSavedMovesAction(nodeId);
+
+      if (result.ok) {
+        setNextMoves(result.moves);
+        return;
+      }
+
+      setNextMoves([]);
+      setNotice({
+        text: result.message ?? "Unable to load saved branches.",
+        tone: "error",
       });
     });
   }
@@ -190,6 +299,11 @@ export default function GoBoard({ canSaveSequences = false }: GoBoardProps) {
                     const pointId = `${rowIndex}:${colIndex}`;
                     const coordinate = formatCoordinate(rowIndex, colIndex);
                     const isHovered = hoveredPoint === pointId;
+                    const branchMove = findNextMove(
+                      rowIndex,
+                      colIndex,
+                      playableNextMoves,
+                    );
                     const isLastMove =
                       state.lastMove?.row === rowIndex &&
                       state.lastMove?.col === colIndex;
@@ -207,8 +321,21 @@ export default function GoBoard({ canSaveSequences = false }: GoBoardProps) {
                         data-last-move={isLastMove || undefined}
                         data-next-player={state.currentPlayer}
                         data-occupied={cell ? "true" : "false"}
+                        data-saved-branch={branchMove ? "true" : undefined}
+                        data-branch-style={
+                          branchMove
+                            ? String(playableNextMoves.indexOf(branchMove) % 4)
+                            : undefined
+                        }
                         onBlur={() => setHoveredPoint(null)}
-                        onClick={() => handlePlay(rowIndex, colIndex)}
+                        onClick={() => {
+                          if (branchMove) {
+                            handleIndicatorClick(branchMove);
+                            return;
+                          }
+
+                          handlePlay(rowIndex, colIndex);
+                        }}
                         onFocus={() => {
                           if (!cell) {
                             setHoveredPoint(pointId);
@@ -225,10 +352,13 @@ export default function GoBoard({ canSaveSequences = false }: GoBoardProps) {
                         aria-label={
                           cell
                             ? `${getPlayerName(cell.color)} stone on ${coordinate}, move ${cell.moveNumber}`
+                            : branchMove
+                              ? `Follow saved ${getPlayerName(branchMove.player)} branch on ${coordinate}`
                             : `Play ${getPlayerName(state.currentPlayer)} on ${coordinate}`
                         }
                         disabled={Boolean(cell)}
                       >
+                        {renderNextMoveIndicator(branchMove)}
                         {showNumber ? (
                           <span className="stone-label">{cell.moveNumber}</span>
                         ) : null}
@@ -294,7 +424,12 @@ export default function GoBoard({ canSaveSequences = false }: GoBoardProps) {
             {notice.text}
           </p>
           <p className="status-meta">
-            {lastMoveRecord ? describeMove(lastMoveRecord) : "No moves yet."}
+            {describeTreeStatus(
+              currentNodeId,
+              playableNextMoves.length,
+              isLoadingBranches,
+              lastMoveRecord,
+            )}
           </p>
         </div>
 
@@ -380,6 +515,47 @@ function labelLabel(labelMode: LabelMode) {
   }
 
   return "Recent";
+}
+
+function findNextMove(
+  row: number,
+  col: number,
+  nextMoves: NextJosekiMove[],
+) {
+  return nextMoves.find((move) => move.row === row && move.col === col);
+}
+
+function renderNextMoveIndicator(move: NextJosekiMove | undefined) {
+  if (!move) {
+    return null;
+  }
+
+  return <span className="next-move-indicator" aria-hidden="true" />;
+}
+
+function describeTreeStatus(
+  currentNodeId: string | null,
+  nextMoveCount: number,
+  isLoadingBranches: boolean,
+  lastMoveRecord: MoveRecord | null,
+) {
+  if (isLoadingBranches) {
+    return "Loading saved branches for this position.";
+  }
+
+  if (!currentNodeId) {
+    return lastMoveRecord
+      ? `${describeMove(lastMoveRecord)} This line is not in the saved tree yet.`
+      : "No saved tree position is active.";
+  }
+
+  if (nextMoveCount > 0) {
+    return `${nextMoveCount} saved next move${nextMoveCount === 1 ? "" : "s"} available from this position.`;
+  }
+
+  return lastMoveRecord
+    ? `${describeMove(lastMoveRecord)} No saved continuations from here yet.`
+    : "No saved first moves yet.";
 }
 
 function describeMove(move: MoveRecord) {

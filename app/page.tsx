@@ -2,6 +2,8 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { signOutAction } from "./auth/actions";
 import GoBoard from "./components/go-board";
+import { getNextSavedMoves, getRootNodeId } from "./sequences/tree";
+import type { NextJosekiMove } from "./sequences/types";
 import { createClient } from "@/lib/supabase/server";
 import { hasSupabaseEnv } from "@/lib/supabase/env";
 
@@ -46,6 +48,18 @@ export default async function Home() {
   const claims = (data?.claims ?? null) as Record<string, unknown> | null;
   const isSignedIn = typeof claims?.sub === "string";
   const email = typeof claims?.email === "string" ? claims.email : null;
+  let initialNodeId: string | null = null;
+  let initialNextMoves: NextJosekiMove[] = [];
+
+  if (isSignedIn) {
+    try {
+      initialNodeId = await getRootNodeId(supabase);
+      initialNextMoves = await getNextSavedMoves(supabase, initialNodeId);
+    } catch {
+      initialNodeId = null;
+      initialNextMoves = [];
+    }
+  }
 
   return (
     <main className="joseki-page">
@@ -89,7 +103,11 @@ export default async function Home() {
       </HeroSection>
 
       {isSignedIn ? (
-        <GoBoard canSaveSequences />
+        <GoBoard
+          canSaveSequences
+          initialNextMoves={initialNextMoves}
+          initialNodeId={initialNodeId}
+        />
       ) : (
         <section className="board-card auth-lock-card">
           <div className="section-heading compact">
